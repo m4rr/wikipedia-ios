@@ -435,6 +435,10 @@ class PlacesViewController: ViewController, UISearchBarDelegate, ArticlePopoverV
         let coordinates: [CLLocationCoordinate2D] =  articles.compactMap({ (article) -> CLLocationCoordinate2D? in
             return article.coordinate
         })
+        return region(thatFits: coordinates)
+    }
+
+    func region(thatFits coordinates: [CLLocationCoordinate2D]) -> MKCoordinateRegion {
         guard coordinates.count > 1 else {
             return coordinates.wmf_boundingRegion(with: 10000)
         }
@@ -1938,7 +1942,35 @@ class PlacesViewController: ViewController, UISearchBarDelegate, ArticlePopoverV
         currentSearch = nil // will cause the default search to perform after re-centering
         recenterOnUserLocation(self)
     }
-    
+
+    func locationInfo(from userInfo: [String: Any]) -> (CLLocationCoordinate2D, String?)? {
+
+        let doubleValue: (String?) -> Double? = {
+            if let str = $0 {
+                return Double(str)
+            }
+            return nil
+        }
+
+        guard let lat = doubleValue(userInfo["lat"] as? String),
+              let long = doubleValue(userInfo["long"] as? String) else {
+            return nil
+        }
+
+        let title = userInfo["name"] as? String
+
+        return (CLLocationCoordinate2DMake(lat, long), title)
+    }
+
+    @objc public func showLocation(userInfo: [String: Any]) {
+        guard let (coord, title) = locationInfo(from: userInfo) else {
+            return
+        }
+
+        let region = self.region(thatFits: [coord])
+        currentSearch = PlaceSearch(filter: .top, type: .location, origin: .user, sortStyle: .links, string: title, region: region, localizedDescription: title, searchResult: nil, siteURL: nil)
+    }
+
     @objc public func showArticleURL(_ articleURL: URL) {
         guard let article = dataStore.fetchArticle(with: articleURL), let title = articleURL.wmf_title,
             view != nil else { // force view instantiation
